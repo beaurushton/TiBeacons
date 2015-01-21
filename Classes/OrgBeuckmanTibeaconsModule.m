@@ -31,9 +31,9 @@
 -(void)startup
 {
 	[super startup];
-    
+
     beaconProximities = [[NSMutableDictionary alloc] init];
-    
+
 	NSLog(@"[INFO] %@ loaded",self);
 }
 
@@ -53,24 +53,24 @@
 	// this method is called when the module is being unloaded
 	// typically this is during shutdown. make sure you don't do too
 	// much processing here or the app will be quit forceably
-	
+
 	// you *must* call the superclass
 	[super shutdown:sender];
 }
 
-#pragma mark Cleanup 
+#pragma mark Cleanup
 
 -(void)dealloc
 {
     [beaconProximities release];
-    
+
     if (_locationManager) {
         [_locationManager release];
     }
     if (peripheralManager) {
         [peripheralManager release];
     }
-    
+
 	// release any resources that have been retained by the module
 	[super dealloc];
 }
@@ -90,7 +90,7 @@
 {
 	if (count == 1 && [type isEqualToString:@"my_event"])
 	{
-		// the first (of potentially many) listener is being added 
+		// the first (of potentially many) listener is being added
 		// for event named 'my_event'
 	}
 }
@@ -121,11 +121,28 @@
     ENSURE_SINGLE_ARG(args, NSDictionary);
 
     CLBeaconRegion *region = [self regionForArgs:args];
-    
+
     NSLog(@"[INFO] Turning on region monitoring in %@", region);
 
     [self.locationManager startMonitoringForRegion:region];
+
+		if(![CLLocationManager isMonitoringAvailableForClass:[CLBeaconRegion class]]) {
+			NSLog(@"[ERROR] Monitoring is not available");
+		}
 }
+
+-(void)stopMonitoringForRegion:(id)args
+{
+		ENSURE_UI_THREAD_1_ARG(args);
+		ENSURE_SINGLE_ARG(args, NSDictionary);
+
+		CLBeaconRegion *region = [self regionForArgs:args];
+
+		NSLog(@"[INFO] Turning off region monitoring in %@", region);
+
+		[self.locationManager stopMonitoringForRegion:region];
+}
+
 
 -(void)stopMonitoringAllRegions:(id)args
 {
@@ -133,12 +150,12 @@
     ENSURE_SINGLE_ARG(args, NSDictionary);
 
     NSArray *regions = [self.locationManager.monitoredRegions allObjects];
-    
+
     for (CLBeaconRegion *region in regions) {
         [self.locationManager stopMonitoringForRegion:region];
     }
     [regions release];
-    
+
     NSLog(@"[INFO] Turned off monitoring in ALL regions.");
 }
 
@@ -153,7 +170,7 @@
 {
     LocationManagerDelegateProxy *proxy = [[LocationManagerDelegateProxy alloc] init];
     [proxy retain];
-    
+
     [proxy proxyAppDelegateLocationManagerMethodsTo:self forManager:_locationManager];
 }
 
@@ -169,16 +186,16 @@
         if (![CLLocationManager locationServicesEnabled]) {
             NSLog(@"[ERROR] Location services are not enabled.");
         }
-        
+
         if ([CLLocationManager authorizationStatus] != kCLAuthorizationStatusAuthorizedAlways) {
             NSLog(@"[ERROR] Location services not authorized.");
         }
-    
+
 
     NSDictionary *event = [[NSDictionary alloc] initWithObjectsAndKeys:
                            [self decodeAuthorizationStatus:[CLLocationManager authorizationStatus]], @"status",
                            nil];
-    
+
     [self fireEvent:@"changeAuthorizationStatus" withObject:event];
 }
 
@@ -187,7 +204,7 @@
 {
     NSLog(@"[INFO] Did start monitoring region: %@", region.identifier);
     [self.locationManager requestStateForRegion:region];
-    
+
     [self fireEvent:@"didStartMonitoringForRegion" withObject:[self detailsForBeaconRegion:(CLBeaconRegion *)region]];
 }
 
@@ -205,20 +222,20 @@
     else {
         NSLog(@"[INFO] State UNKNOWN region: %@", region.identifier);
     }
-    
+
     NSMutableDictionary *event = [NSMutableDictionary dictionaryWithDictionary:[self detailsForBeaconRegion:(CLBeaconRegion *)region]];
     [event setObject:[self decodeRegionState:state] forKey:@"regionState"];
-    
+
     [self fireEvent:@"determinedRegionState" withObject:event];
 
 }
 
 - (void)locationManager:(CLLocationManager *)manager didEnterRegion:(CLRegion *)region {
-    
+
     NSLog(@"[INFO] Entered region %@", region.identifier);
 
     [self fireEvent:@"enteredRegion" withObject:[self detailsForBeaconRegion:(CLBeaconRegion *)region]];
-    
+
 }
 
 -(void)locationManager:(CLLocationManager *)manager didExitRegion:(CLRegion *)region {
@@ -234,10 +251,10 @@
 
 - (CLBeaconRegion *)createBeaconRegionWithUUID:(NSString *)uuid major:(NSInteger)major minor:(NSInteger)minor identifier:(NSString *)identifier
 {
-    
+
     NSUUID *proximityUUID = [[NSUUID alloc] initWithUUIDString:uuid];
     CLBeaconRegion *region;
-    
+
     if (major != -1 && minor != -1) {
         region = [[CLBeaconRegion alloc] initWithProximityUUID:proximityUUID major:major minor:minor identifier:identifier];
     }
@@ -247,27 +264,27 @@
     else {
         region = [[CLBeaconRegion alloc] initWithProximityUUID:proximityUUID identifier:identifier];
     }
-    
+
     [proximityUUID release];
-    
+
     region.notifyEntryStateOnDisplay = true;
     region.notifyOnEntry = true;
     region.notifyOnExit = true;
-    
+
     return [region autorelease];
 }
 
 - (void)turnOnRangingWithRegion:(CLBeaconRegion *)region
 {
     NSLog(@"[INFO] Turning on ranging for %@", region);
-    
+
     if (![CLLocationManager isRangingAvailable]) {
         NSLog(@"[INFO] Couldn't turn on ranging: Ranging is not available.");
         return;
     }
-    
+
     [self.locationManager startRangingBeaconsInRegion:region];
-    
+
     NSLog(@"[INFO] Ranging turned on for region: %@.", region);
 }
 
@@ -276,7 +293,7 @@
 {
     ENSURE_UI_THREAD_1_ARG(args);
     ENSURE_SINGLE_ARG(args, NSDictionary);
-    
+
     [self turnOnRangingWithRegion:[self regionForArgs:args]];
 }
 
@@ -284,7 +301,7 @@
 {
     ENSURE_UI_THREAD_1_ARG(args);
     ENSURE_SINGLE_ARG(args, NSDictionary);
-    
+
     [self.locationManager stopRangingBeaconsInRegion:[self regionForArgs:args]];
 }
 
@@ -293,17 +310,17 @@
     NSString *uuid = [TiUtils stringValue:[args objectForKey:@"uuid"]];
     NSInteger major = (NSUInteger)[TiUtils intValue:[args objectForKey:@"major"] def:-1];
     NSInteger minor = (NSUInteger)[TiUtils intValue:[args objectForKey:@"minor"] def:-1];
-    
+
     NSString *identifier = [TiUtils stringValue:[args objectForKey:@"identifier"]];
-    
+
     CLBeaconRegion *region = [self createBeaconRegionWithUUID:uuid major:major minor:minor identifier:identifier];
-    
+
     NSString *notify = [TiUtils stringValue:[args objectForKey:@"notifyEntryStateOnDisplay"]];
     if (notify && [notify isEqualToString:@"YES"]) {
         region.notifyEntryStateOnDisplay = YES;
         NSLog(@"[INFO] notifyEntryStateOnDisplay ON");
     }
-    
+
     return region;
 }
 
@@ -316,14 +333,13 @@
         NSLog(@"[INFO] Didn't turn off ranging: Ranging already off.");
         return;
     }
-    return;
-    
+
     NSArray *regions = [self.locationManager.rangedRegions allObjects];
     for (CLBeaconRegion *region in regions) {
         [self.locationManager stopRangingBeaconsInRegion:region];
     }
     [regions release];
-    
+
     NSLog(@"[INFO] Turned off ranging in ALL regions.");
 }
 
@@ -350,9 +366,9 @@
 - (void)locationManager:(CLLocationManager *)manager
         didRangeBeacons:(NSArray *)beacons
                inRegion:(CLBeaconRegion *)region {
-    
+
     NSArray *filteredBeacons = [self filteredBeacons:beacons];
-    
+
     if (filteredBeacons.count == 0) {
         // do nothing - no beacons
     }
@@ -365,7 +381,7 @@
             // do something with object
             [eventBeacons addObject:[self detailsForBeacon:beacon]];
         }
-        
+
         NSDictionary *event = [[NSDictionary alloc] initWithObjectsAndKeys:
                                region.identifier, @"identifier",
                                region.proximityUUID.UUIDString, @"uuid",
@@ -373,10 +389,10 @@
                                eventBeacons, @"beacons",
                                nil];
         [eventBeacons release];
-    
+
         [self fireEvent:@"beaconRanges" withObject:event];
         [event release];
-        
+
         [self reportCrossings:filteredBeacons inRegion:region];
     }
 }
@@ -386,15 +402,15 @@
     for (int index = 0; index < [beacons count]; index++) {
         CLBeacon *current = [beacons objectAtIndex:index];
         NSString *identifier = [NSString stringWithFormat:@"%@/%@/%@", current.proximityUUID.UUIDString, current.major, current.minor];
-        
+
         CLBeacon *previous = [beaconProximities objectForKey:identifier];
         if (previous) {
-            
+
             if (previous.proximity != current.proximity) {
                 NSMutableDictionary *event = [NSMutableDictionary dictionaryWithDictionary:[self detailsForBeacon:current]];
                 [event setObject:region.identifier forKey:@"identifier"];
                 [event setObject:[self decodeProximity:previous.proximity] forKey:@"fromProximity"];
-                
+
                 [self fireEvent:@"beaconProximity" withObject:event];
             }
         }
@@ -415,12 +431,12 @@
 {
     // Filters duplicate beacons out; this may happen temporarily if the originating device changes its Bluetooth id
     NSMutableArray *mutableBeacons = [beacons mutableCopy];
-    
+
     NSMutableSet *lookup = [[NSMutableSet alloc] init];
     for (int index = 0; index < [beacons count]; index++) {
         CLBeacon *curr = [beacons objectAtIndex:index];
         NSString *identifier = [NSString stringWithFormat:@"%@/%@", curr.major, curr.minor];
-        
+
         // this is very fast constant time lookup in a hash table
         if ([lookup containsObject:identifier]) {
             [mutableBeacons removeObjectAtIndex:index];
@@ -428,16 +444,16 @@
             [lookup addObject:identifier];
         }
     }
-    
+
     return [mutableBeacons copy];
 }
 
 
 - (NSDictionary *)detailsForBeacon:(CLBeacon *)beacon
 {
-    
+
     NSString *proximity = [self decodeProximity:beacon.proximity];
-    
+
     NSDictionary *details = [[NSDictionary alloc] initWithObjectsAndKeys:
                              beacon.proximityUUID.UUIDString, @"uuid",
                              [NSString stringWithFormat:@"%@", beacon.major], @"major",
@@ -447,12 +463,12 @@
                              [NSString stringWithFormat:@"%ld", (long)beacon.rssi], @"rssi",
                              nil
                              ];
-    
+
     return [details autorelease];
 }
 - (NSDictionary *)detailsForBeaconRegion:(CLBeaconRegion *)region
 {
-    
+
     NSMutableDictionary *details = [[NSMutableDictionary alloc] initWithObjectsAndKeys:
                              region.identifier, @"identifier",
                              region.proximityUUID.UUIDString, @"uuid",
@@ -465,7 +481,7 @@
     if (region.minor) {
         [details setObject:[NSString stringWithFormat:@"%@", region.minor] forKey:@"minor"];
     }
-    
+
     return details;
 }
 
@@ -498,7 +514,7 @@
             return @"unknown";
             break;
     }
-    
+
 }
 - (NSString *)decodeRegionState:(int)state
 {
@@ -514,7 +530,7 @@
             return @"unknown";
             break;
     }
-    
+
 }
 
 
@@ -529,7 +545,7 @@
 
     NSDictionary *beaconPeripheralData = [beaconRegion peripheralDataWithMeasuredPower:nil];
     [peripheralManager startAdvertising:beaconPeripheralData];
-    
+
     NSLog(@"[INFO] Turning on advertising for region: %@.", beaconRegion);
 }
 
@@ -538,36 +554,36 @@
 {
     ENSURE_UI_THREAD_1_ARG(args);
     ENSURE_SINGLE_ARG(args, NSDictionary);
-    
+
     NSString *uuid = [TiUtils stringValue:[args objectForKey:@"uuid"]];
     NSString *identifier = [TiUtils stringValue:[args objectForKey:@"identifier"]];
-    
+
     NSUInteger major = (NSUInteger)[TiUtils intValue:[args objectForKey:@"major"] def:1];
     NSUInteger minor = (NSUInteger)[TiUtils intValue:[args objectForKey:@"minor"] def:1];
 
     NSLog(@"[INFO] Turning on advertising...");
-    
+
     beaconRegion = [self createBeaconRegionWithUUID:uuid major:major minor:minor identifier:identifier];
     [beaconRegion retain];
-    
+
     if (!peripheralManager) {
         peripheralManager = [[CBPeripheralManager alloc] initWithDelegate:self queue:nil options:nil];
     }
-    
+
     [self turnOnAdvertising];
 }
 
 - (void)stopAdvertisingBeacon:(id)args
 {
-    
+
     if (peripheralManager) {
-        
+
         if (peripheralManager.state == CBPeripheralManagerStatePoweredOn){
-            
+
             [peripheralManager stopAdvertising];
-            
+
             [beaconRegion release];
-            
+
             NSLog(@"[INFO] Turned off advertising.");
         }else{
             NSLog(@"[INFO] peripheral manager state was off, no need to turn advertsing off");
@@ -586,10 +602,10 @@
 
         return;
     }
-    
+
     if (pManager.isAdvertising) {
         NSLog(@"[INFO] Turned on advertising.");
-        
+
         NSDictionary *status = [[NSDictionary alloc] initWithObjectsAndKeys: @"on", @"status", nil];
 
         [self fireEvent:@"advertisingStatus" withObject:status];
@@ -603,7 +619,7 @@
         NSLog(@"[INFO] Peripheral manager is off.");
         return;
     }
-    
+
     NSLog(@"[INFO] Peripheral manager is on.");
 
     [self turnOnAdvertising];
@@ -626,7 +642,7 @@
     }
 
     NSDictionary *status = [[NSDictionary alloc] initWithObjectsAndKeys: stateString, @"status", nil];
-    
+
     [self fireEvent:@"bluetoothStatus" withObject:status];
     [status autorelease];
 
